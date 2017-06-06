@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<phpunit
+        bootstrap="tests/_bootstrap.php"
+        colors="true">
+    <testsuites>
+        <testsuite name="ordering-unit">
+            <directory>tests/unit/domain</directory>
+
+        </testsuite>
+    </testsuites>
+
+    <filter>
+        <whitelist processUncoveredFilesFromWhitelist="true">
+            <directory suffix=".php">tests/unit/domain</directory>
+        </whitelist>
+    </filter>
+
+</phpunit>
