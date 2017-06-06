@@ -13,7 +13,7 @@ class m170606_105521_create_order extends Migration
             'productPrice' => $this->decimal(7, 2),
             'quantity' => $this->integer(),
             'totalPrice'=> $this->decimal(7, 2),
-            'dataCreated'=>$this->timestamp(),
+            'dateCreated'=>$this->timestamp(),
         ]);
 
         $this->addForeignKey('order_user', 'order', 'userId', 'user', 'id');

@@ -8,16 +8,55 @@
 
 namespace tests\domain\order;
 
+use app\domain\order\DataProvider;
+use app\domain\order\ViewModel;
 use \PHPUnit\Framework\TestCase;
 
 use app\domain\order\Creator;
+use yii\data\ActiveDataProvider;
 
 class CreatorTest extends TestCase
 {
+    /**
+     * @var DataProvider | \PHPUnit_Framework_MockObject_MockObject
+     */
+    private $dataProviderMock;
+    /**
+     * @var ViewModel
+     */
+    private $view;
+
+    /**
+     * @var Creator
+     */
+    private $object;
+
     public function setUp()
     {
-        $order = new Creator();
 
+        $this->dataProviderMock = $this->getMockBuilder(DataProvider::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $this->view = new ViewModel();
+
+        $this->object = new Creator($this->dataProviderMock, $this->view);
         parent::setUp();
+    }
+
+    /**
+     * @test
+     */
+    public function loadRecordsAddsActiveDataProviderInView()
+    {
+        $activeDataProvider = new ActiveDataProvider();
+        $this->dataProviderMock->expects($this->once())
+            ->method('get')
+            ->willReturn($activeDataProvider);
+
+        $actualView = $this->object->loadRecords([]);
+
+        $this->assertSame($this->view, $actualView);
+        $this->assertSame($activeDataProvider, $this->view->dataProvider);
     }
 }
