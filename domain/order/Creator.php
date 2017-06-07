@@ -35,9 +35,9 @@ class Creator
      * @param ListDataProvider $dataProvider
      * @param AssocEntityRepo $entityRepo
      */
-    public function __construct(ListDataProvider $dataProvider, AssocEntityRepo $entityRepo)
+    public function __construct(ListDataProvider $dataProvider, AssocEntityRepo $entityRepo, ViewModel $viewModel)
     {
-        $this->viewModel = new ViewModel();
+        $this->viewModel = $viewModel;
         $this->dataProvider = $dataProvider;
         $this->entityRepo = $entityRepo;
     }
@@ -60,17 +60,21 @@ class Creator
      */
     public static function instance()
     {
+        $viewModel = new ViewModel();
         /**
          * Filters can be added in runtime without modifying ListDataProvider.
          * This could be implemented via Chain of commands pattern as well.
          */
         $filters = [
-            new DaysPastFilter(),
-            new ColumnFilter('productId'),
-            new ColumnFilter('userId'),
+            /**
+             * @todo Passing in ViewModel is not the best idea.
+             */
+            new DaysPastFilter($viewModel),
+            new IntegerColumnFilter('productId', $viewModel),
+            new IntegerColumnFilter('userId', $viewModel),
         ];
 
         return new static(new ListDataProvider(new ActiveQuery('app\models\Order'), $filters),
-            new AssocEntityRepo(new Query()));
+            new AssocEntityRepo(new Query()), $viewModel);
     }
 }

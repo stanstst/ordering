@@ -8,8 +8,9 @@
 
 namespace tests\domain\order;
 
-use app\domain\order\ColumnFilter;
+use app\domain\order\IntegerColumnFilter;
 use app\domain\order\ListFilter;
+use app\domain\order\ViewModel;
 use PHPUnit\Framework\TestCase;
 use yii\db\ActiveQuery;
 
@@ -18,7 +19,11 @@ class ColumnFilterTest extends TestCase
     private $columnName = 'column';
     private $columnValue = '123';
     /**
-     * @var ColumnFilter
+     * @var ViewModel
+     */
+    private $viewModel;
+    /**
+     * @var IntegerColumnFilter
      */
     private $object;
 
@@ -34,7 +39,9 @@ class ColumnFilterTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $this->object = new ColumnFilter($this->columnName);
+        $this->viewModel = new ViewModel();
+
+        $this->object = new IntegerColumnFilter($this->columnName, $this->viewModel);
     }
 
     /**
@@ -45,17 +52,21 @@ class ColumnFilterTest extends TestCase
         $this->queryMock->expects($this->once())
             ->method('andWhere')
             ->with([$this->columnName => $this->columnValue]);
+
         $request = [
             ListFilter::LIST_FILTER_REQUEST_KEY =>
                 [
                     $this->columnName => $this->columnValue
                 ]
         ];
+
         $this->object->apply($this->queryMock, $request);
+
+        $this->assertEquals([$this->columnName => (integer)$this->columnValue], $this->viewModel->filtersState);
     }
 
     /**
-     * @testtt
+     * @test
      */
     public function doesNotAddWhereIfFilterColumnMissingInRequest()
     {
@@ -68,6 +79,8 @@ class ColumnFilterTest extends TestCase
                     'other-columnName' => $this->columnValue
                 ]
         ];
+
         $this->object->apply($this->queryMock, $request);
+        $this->assertEquals([], $this->viewModel->filtersState);
     }
 }

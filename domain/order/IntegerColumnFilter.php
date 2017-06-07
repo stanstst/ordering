@@ -10,21 +10,27 @@ namespace app\domain\order;
 
 use yii\db\ActiveQuery;
 
-class ColumnFilter implements ListFilter
+class IntegerColumnFilter implements ListFilter
 {
 
     /**
      * @var string
      */
     private $columnName;
+    /**
+     * @var ViewModel
+     */
+    private $viewModel;
 
     /**
      * ColumnFilter constructor.
      * @param string $columnName
+     * @param ViewModel $viewModel
      */
-    public function __construct($columnName)
+    public function __construct($columnName, ViewModel $viewModel)
     {
         $this->columnName = $columnName;
+        $this->viewModel = $viewModel;
     }
 
     /**
@@ -36,8 +42,9 @@ class ColumnFilter implements ListFilter
     {
         if (!$this->isValidRequest($request)) return;
 
-        $filterValue = $request[self::LIST_FILTER_REQUEST_KEY][$this->columnName];
+        $filterValue = (integer)$request[self::LIST_FILTER_REQUEST_KEY][$this->columnName];
         $activeQuery->andWhere([$this->columnName => $filterValue]);
+        $this->viewModel->filtersState[$this->columnName] = $filterValue;
     }
 
     private function isValidRequest($request)

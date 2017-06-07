@@ -13,12 +13,18 @@ use yii\db\ActiveQuery;
 class DaysPastFilter implements ListFilter
 {
     const FILTER_KEY = 'daysPast';
+    /**
+     * @var ViewModel
+     */
+    private $viewModel;
 
     /**
      * DaysPastFilter constructor.
+     * @param ViewModel $viewModel
      */
-    public function __construct()
+    public function __construct(ViewModel $viewModel)
     {
+        $this->viewModel = $viewModel;
     }
 
     /**
@@ -34,6 +40,7 @@ class DaysPastFilter implements ListFilter
 
         $days = (integer)$request[self::LIST_FILTER_REQUEST_KEY][self::FILTER_KEY];
         $activeQuery->andWhere('(DATEDIFF(CURDATE(), dateCreated)) <= ' . $days);
+        $this->viewModel->filtersState[self::FILTER_KEY] = $days;
     }
 
     /**

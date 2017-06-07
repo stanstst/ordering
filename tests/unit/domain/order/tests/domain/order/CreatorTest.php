@@ -44,7 +44,7 @@ class CreatorTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $this->object = new Creator($this->dataProviderMock, $this->entityRepoMock);
+        $this->object = new Creator($this->dataProviderMock, $this->entityRepoMock, new ViewModel());
         parent::setUp();
     }
 

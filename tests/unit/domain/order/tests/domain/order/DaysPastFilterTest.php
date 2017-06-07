@@ -10,11 +10,13 @@ namespace tests\domain\order;
 
 use app\domain\order\DaysPastFilter;
 use app\domain\order\ListFilter;
+use app\domain\order\ViewModel;
 use PHPUnit\Framework\TestCase;
 use yii\db\ActiveQuery;
 
 class DaysPastFilterTest extends TestCase
 {
+    private $viewModel;
     /**
      * @var DaysPastFilter
      */
@@ -32,7 +34,8 @@ class DaysPastFilterTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $this->object = new DaysPastFilter();
+        $this->viewModel = new ViewModel();
+        $this->object = new DaysPastFilter($this->viewModel);
     }
 
     /**
@@ -52,6 +55,8 @@ class DaysPastFilterTest extends TestCase
             ->with('(DATEDIFF(CURDATE(), dateCreated)) <= 3');
 
         $this->object->apply($this->queryMock, $request);
+
+        $this->assertEquals([DaysPastFilter::FILTER_KEY => 3], $this->viewModel->filtersState);
     }
 
     /**
@@ -63,6 +68,8 @@ class DaysPastFilterTest extends TestCase
             ->method('andWhere');
         $this->object->apply($this->queryMock, []);
         $this->object->apply($this->queryMock, [ListFilter::LIST_FILTER_REQUEST_KEY => ['otherKey' => '123']]);
+
+        $this->assertEquals([], $this->viewModel->filtersState);
     }
 
     /**
@@ -80,5 +87,7 @@ class DaysPastFilterTest extends TestCase
                 ]
         ];
         $this->object->apply($this->queryMock, $request);
+
+        $this->assertEquals([], $this->viewModel->filtersState);
     }
 }

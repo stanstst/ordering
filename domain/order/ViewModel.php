@@ -18,7 +18,7 @@ class ViewModel
 
     public $users;
 
-    public $filtersState = [''];
+    public $filtersState = [];
 
     public $errors = [];
 
