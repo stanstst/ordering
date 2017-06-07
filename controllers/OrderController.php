@@ -35,7 +35,7 @@ class OrderController extends Controller
      */
     public function actionIndex()
     {
-        $viewData = Creator::instance()->loadRecords([]);
+        $viewData = Creator::instance()->loadRecords(Yii::$app->request->get());
 
         return $this->render('index', (array)$viewData);
     }

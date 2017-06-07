@@ -28,13 +28,23 @@ class DaysPastFilter implements ListFilter
      */
     public function apply(ActiveQuery $activeQuery, array $request)
     {
-        if (!array_key_exists(self::LIST_FILTER_REQUEST_KEY, $request) ||
-            !array_key_exists(self::FILTER_KEY, $request[self::LIST_FILTER_REQUEST_KEY])
-        ) {
+        if (!$this->isValidRequest($request)) {
             return;
         }
 
-        $days = $request[self::LIST_FILTER_REQUEST_KEY][self::FILTER_KEY];
-        $activeQuery->andWhere('(DATEDIFF(CURDATE(), dateCreated)) < ' . $days);
+        $days = (integer)$request[self::LIST_FILTER_REQUEST_KEY][self::FILTER_KEY];
+        $activeQuery->andWhere('(DATEDIFF(CURDATE(), dateCreated)) <= ' . $days);
+    }
+
+    /**
+     * @param array $request
+     * @return bool
+     */
+    private function isValidRequest(array $request)
+    {
+        $valueExists = array_key_exists(self::LIST_FILTER_REQUEST_KEY, $request) &&
+            array_key_exists(self::FILTER_KEY, $request[self::LIST_FILTER_REQUEST_KEY]);
+
+        return $valueExists && is_numeric($request[self::LIST_FILTER_REQUEST_KEY][self::FILTER_KEY]);
     }
 }

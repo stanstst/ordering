@@ -40,10 +40,16 @@ class DaysPastFilterTest extends TestCase
      */
     public function addsWhereClauseIfPastDaysArePresentInRequest()
     {
-        $request[ListFilter::LIST_FILTER_REQUEST_KEY][DaysPastFilter::FILTER_KEY] = 3;
+
+        $request = [
+            ListFilter::LIST_FILTER_REQUEST_KEY =>
+                [
+                    DaysPastFilter::FILTER_KEY => '3'
+                ]
+        ];
         $this->queryMock->expects($this->once())
             ->method('andWhere')
-            ->with('(DATEDIFF(CURDATE(), dateCreated)) < 3');
+            ->with('(DATEDIFF(CURDATE(), dateCreated)) <= 3');
 
         $this->object->apply($this->queryMock, $request);
     }
@@ -51,10 +57,28 @@ class DaysPastFilterTest extends TestCase
     /**
      * @test
      */
-    public function doesNotAddWhereIfFilterDaysIsMissingInRequest() {
+    public function doesNotAddWhereIfFilterDaysIsMissingInRequest()
+    {
         $this->queryMock->expects($this->never())
             ->method('andWhere');
         $this->object->apply($this->queryMock, []);
-        $this->object->apply($this->queryMock, [ListFilter::LIST_FILTER_REQUEST_KEY => ['otherKey' => 123]]);
+        $this->object->apply($this->queryMock, [ListFilter::LIST_FILTER_REQUEST_KEY => ['otherKey' => '123']]);
+    }
+
+    /**
+     * @test
+     */
+    public function doesNotAddWhereIfFilterDaysIsInvalidInRequest()
+    {
+        $this->queryMock->expects($this->never())
+            ->method('andWhere');
+
+        $request = [
+            ListFilter::LIST_FILTER_REQUEST_KEY =>
+                [
+                    DaysPastFilter::FILTER_KEY => 'non-integer'
+                ]
+        ];
+        $this->object->apply($this->queryMock, $request);
     }
 }
