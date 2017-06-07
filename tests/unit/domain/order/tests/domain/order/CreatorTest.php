@@ -8,7 +8,7 @@
 
 namespace tests\domain\order;
 
-use app\domain\order\DataProvider;
+use app\domain\order\ListDataProvider;
 use app\domain\order\ViewModel;
 use \PHPUnit\Framework\TestCase;
 
@@ -18,7 +18,7 @@ use yii\data\ActiveDataProvider;
 class CreatorTest extends TestCase
 {
     /**
-     * @var DataProvider | \PHPUnit_Framework_MockObject_MockObject
+     * @var ListDataProvider | \PHPUnit_Framework_MockObject_MockObject
      */
     private $dataProviderMock;
     /**
@@ -34,7 +34,7 @@ class CreatorTest extends TestCase
     public function setUp()
     {
 
-        $this->dataProviderMock = $this->getMockBuilder(DataProvider::class)
+        $this->dataProviderMock = $this->getMockBuilder(ListDataProvider::class)
             ->disableOriginalConstructor()
             ->getMock();
 

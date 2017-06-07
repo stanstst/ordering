@@ -8,7 +8,8 @@
 
 namespace tests\domain\order;
 
-use app\domain\order\DataProvider;
+use app\domain\order\ListDataProvider;
+use app\domain\order\ListFilter;
 use PHPUnit\Framework\TestCase;
 use yii\data\ActiveDataProvider;
 use yii\db\ActiveQuery;
@@ -21,9 +22,14 @@ class DataProviderTest extends TestCase
      */
     private $queryMock;
     /**
-     * @var DataProvider
+     * @var ListDataProvider
      */
     private $object;
+
+    /**
+     * @var ListFilter | \PHPUnit_Framework_MockObject_MockObject
+     */
+    private $filterMock;
 
     public function setUp()
     {
@@ -42,7 +48,9 @@ class DataProviderTest extends TestCase
             ->method('andWhere')
             ->willReturnSelf();
 
-        $this->object = new DataProvider($this->queryMock);
+        $this->filterMock = $this->getMockBuilder(ListFilter::class)
+            ->getMock();
+        $this->object = new ListDataProvider($this->queryMock, [$this->filterMock]);
     }
 
     /**
@@ -53,7 +61,7 @@ class DataProviderTest extends TestCase
         $this->queryMock->expects($this->once())
             ->method('with')
             ->with(['user', 'product']);
-        $this->object->get();
+        $this->object->get(['request']);
     }
 
     /**
@@ -61,8 +69,20 @@ class DataProviderTest extends TestCase
      */
     public function returnsActiveDataProviderWithInjectedQuery()
     {
-        $actualActiveDataProvider = $this->object->get();
+        $actualActiveDataProvider = $this->object->get(['request']);
         $this->assertInstanceOf(ActiveDataProvider::class, $actualActiveDataProvider);
         $this->assertEquals($this->queryMock, $actualActiveDataProvider->query);
+    }
+
+    /**
+     * @test
+     */
+    public function callsApplyOnListFilters()
+    {
+        $this->filterMock->expects($this->once())
+            ->method('apply')
+            ->with($this->queryMock, ['request']);
+
+        $this->object->get(['request']);
     }
 }

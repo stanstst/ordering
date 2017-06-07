@@ -8,10 +8,7 @@
 
 namespace app\domain\order;
 
-use app\models\Order;
-use yii\data\ActiveDataProvider;
 use yii\db\ActiveQuery;
-use yii\db\Query;
 
 class Creator
 {
@@ -19,17 +16,18 @@ class Creator
      * @var ViewModel
      */
     private $viewModel;
+
     /**
-     * @var DataProvider
+     * @var ListDataProvider
      */
     private $dataProvider;
 
     /**
      * Creator constructor.
-     * @param DataProvider $dataProvider
+     * @param ListDataProvider $dataProvider
      * @param ViewModel $viewModel
      */
-    public function __construct(DataProvider $dataProvider, ViewModel $viewModel)
+    public function __construct(ListDataProvider $dataProvider, ViewModel $viewModel)
     {
         $this->viewModel = $viewModel;
         $this->dataProvider = $dataProvider;
@@ -38,7 +36,7 @@ class Creator
     public function loadRecords($request)
     {
 
-        $this->viewModel->setDataProvider($this->dataProvider->get());
+        $this->viewModel->setDataProvider($this->dataProvider->get($request));
 
         return $this->viewModel;
     }
@@ -48,6 +46,10 @@ class Creator
      */
     public static function instance()
     {
-        return new static(new DataProvider(new ActiveQuery('app\models\Order')), new ViewModel());
+        $filters = [
+            new DaysPastFilter(),
+        ];
+
+        return new static(new ListDataProvider(new ActiveQuery('app\models\Order'), $filters), new ViewModel());
     }
 }
