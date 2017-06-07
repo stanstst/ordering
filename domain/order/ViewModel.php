@@ -14,6 +14,14 @@ class ViewModel
 {
     public $dataProvider;
 
+    public $products;
+
+    public $users;
+
+    public $filtersState = [''];
+
+    public $errors = [];
+
     /**
      * @param mixed $dataProvider
      */
@@ -21,4 +29,5 @@ class ViewModel
     {
         $this->dataProvider = $dataProvider;
     }
+
 }

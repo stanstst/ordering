@@ -8,8 +8,11 @@
 
 namespace tests\domain\order;
 
+use app\components\AssocEntityRepo;
 use app\domain\order\ListDataProvider;
 use app\domain\order\ViewModel;
+use app\models\Product;
+use app\models\User;
 use \PHPUnit\Framework\TestCase;
 
 use app\domain\order\Creator;
@@ -22,14 +25,13 @@ class CreatorTest extends TestCase
      */
     private $dataProviderMock;
     /**
-     * @var ViewModel
-     */
-    private $view;
-
-    /**
      * @var Creator
      */
     private $object;
+    /**
+     * @var AssocEntityRepo | \PHPUnit_Framework_MockObject_MockObject
+     */
+    private $entityRepoMock;
 
     public function setUp()
     {
@@ -38,9 +40,11 @@ class CreatorTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $this->view = new ViewModel();
+        $this->entityRepoMock = $this->getMockBuilder(AssocEntityRepo::class)
+            ->disableOriginalConstructor()
+            ->getMock();
 
-        $this->object = new Creator($this->dataProviderMock, $this->view);
+        $this->object = new Creator($this->dataProviderMock, $this->entityRepoMock);
         parent::setUp();
     }
 
@@ -56,7 +60,26 @@ class CreatorTest extends TestCase
 
         $actualView = $this->object->loadRecords([]);
 
-        $this->assertSame($this->view, $actualView);
-        $this->assertSame($activeDataProvider, $this->view->dataProvider);
+        $this->assertInstanceOf(ViewModel::class, $actualView);
+        $this->assertSame($activeDataProvider, $actualView->dataProvider);
+    }
+
+    /**
+     * @test
+     */
+    public function loadRecordsAddsProductsInView()
+    {
+        $expectedProducts = ['product1', 'product2'];
+        $expectedUsers = ['user1', 'user2'];
+        $this->entityRepoMock->expects($this->exactly(2))
+            ->method('getList')
+            ->withConsecutive([Product::tableName(), ['id', 'name']],
+                [User::tableName(), ['id', 'firstName', 'lastName']])
+            ->willReturnOnConsecutiveCalls($expectedProducts, $expectedUsers);
+
+        $actualView = $this->object->loadRecords([]);
+
+        $this->assertInstanceOf(ViewModel::class, $actualView);
+        $this->assertEquals($expectedProducts, $actualView->products);
     }
 }

@@ -8,7 +8,11 @@
 
 namespace app\domain\order;
 
+use app\components\AssocEntityRepo;
+use app\models\Product;
+use app\models\User;
 use yii\db\ActiveQuery;
+use yii\db\Query;
 
 class Creator
 {
@@ -21,22 +25,32 @@ class Creator
      * @var ListDataProvider
      */
     private $dataProvider;
+    /**
+     * @var AssocEntityRepo
+     */
+    private $entityRepo;
 
     /**
      * Creator constructor.
      * @param ListDataProvider $dataProvider
-     * @param ViewModel $viewModel
+     * @param AssocEntityRepo $entityRepo
      */
-    public function __construct(ListDataProvider $dataProvider, ViewModel $viewModel)
+    public function __construct(ListDataProvider $dataProvider, AssocEntityRepo $entityRepo)
     {
-        $this->viewModel = $viewModel;
+        $this->viewModel = new ViewModel();
         $this->dataProvider = $dataProvider;
+        $this->entityRepo = $entityRepo;
     }
 
-    public function loadRecords($request)
+    /**
+     * @param $request []
+     * @return ViewModel
+     */
+    public function loadRecords(array $request)
     {
-
-        $this->viewModel->setDataProvider($this->dataProvider->get($request));
+        $this->viewModel->dataProvider = $this->dataProvider->get($request);
+        $this->viewModel->products = $this->entityRepo->getList(Product::tableName(), ['id', 'name']);
+        $this->viewModel->users = $this->entityRepo->getList(User::tableName(), ['id', 'firstName', 'lastName']);
 
         return $this->viewModel;
     }
@@ -46,10 +60,17 @@ class Creator
      */
     public static function instance()
     {
+        /**
+         * Filters can be added in runtime without modifying ListDataProvider.
+         * This could be implemented via Chain of commands pattern as well.
+         */
         $filters = [
             new DaysPastFilter(),
+            new ColumnFilter('productId'),
+            new ColumnFilter('userId'),
         ];
 
-        return new static(new ListDataProvider(new ActiveQuery('app\models\Order'), $filters), new ViewModel());
+        return new static(new ListDataProvider(new ActiveQuery('app\models\Order'), $filters),
+            new AssocEntityRepo(new Query()));
     }
 }
