@@ -1,6 +1,7 @@
 <?php
 use app\domain\order\DaysPastFilter;
 use app\domain\order\ListFilter;
+use app\views\order\helpers\DropDown;
 use yii\helpers\Html;
 use yii\helpers\Url;
 
@@ -35,7 +36,7 @@ echo Html::dropDownList($daysFieldName, $selected, $daysOptions, ['id' => 'dateC
 <?php $productFieldName =
     ListFilter::LIST_FILTER_REQUEST_KEY . '[productId]';
 
-$productOptions = ['any' => 'Any'];
+$productOptions = array_merge(['any' => 'Any'], DropDown::getProductOptions($products));
 foreach ($products as $product) {
     $productOptions[$product['id']] = $product['name'];
 }
@@ -48,7 +49,7 @@ echo Html::dropDownList($productFieldName, $selected, $productOptions, ['id' => 
 <?php $userFieldName =
     ListFilter::LIST_FILTER_REQUEST_KEY . '[userId]';
 
-$userOptions = ['any' => 'Any'];
+$userOptions = array_merge(['any' => 'Any'], DropDown::getUserOptions($users));
 foreach ($users as $user) {
     $userOptions[$user['id']] = $user['firstName'] . ' ' . $user['lastName'];
 }

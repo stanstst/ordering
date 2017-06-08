@@ -15,7 +15,7 @@ use app\models\Product;
 use app\models\User;
 use \PHPUnit\Framework\TestCase;
 
-use app\domain\order\Creator;
+use app\domain\order\ListPanel;
 use yii\data\ActiveDataProvider;
 
 class CreatorTest extends TestCase
@@ -25,7 +25,7 @@ class CreatorTest extends TestCase
      */
     private $dataProviderMock;
     /**
-     * @var Creator
+     * @var ListPanel
      */
     private $object;
     /**
@@ -44,7 +44,7 @@ class CreatorTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $this->object = new Creator($this->dataProviderMock, $this->entityRepoMock, new ViewModel());
+        $this->object = new ListPanel($this->dataProviderMock, $this->entityRepoMock, new ViewModel());
         parent::setUp();
     }
 

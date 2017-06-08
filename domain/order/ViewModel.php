@@ -14,6 +14,8 @@ class ViewModel
 {
     public $dataProvider;
 
+    public $order;
+
     public $products;
 
     public $users;
