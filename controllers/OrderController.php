@@ -2,6 +2,7 @@
 
 namespace app\controllers;
 
+use app\domain\order\Creator;
 use app\domain\order\ListPanel;
 use Yii;
 use app\models\Order;
@@ -36,6 +37,7 @@ class OrderController extends Controller
     public function actionIndex()
     {
         if (Yii::$app->request->post()) {
+            Creator::instance()->create(Yii::$app->request->post()['Order']);
             return $this->redirect(array_merge(['index'], Yii::$app->request->get()));
         }
 

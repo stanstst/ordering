@@ -8,7 +8,17 @@
 
 namespace app\components;
 
+use yii\db\ActiveRecord;
+
 class EntityPersistor
 {
 
+    /**
+     * @param ActiveRecord $record
+     */
+    public function save(ActiveRecord $record)
+    {
+
+        $record->save();
+    }
 }

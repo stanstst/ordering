@@ -33,4 +33,11 @@ class AssocEntityRepo
             ->from($entityName)
             ->all();
     }
+    public function getById($entityName, $id, $columns = ['*'])
+    {
+        return $this->activeQuery->select($columns)
+            ->from($entityName)
+            ->where(['id' => $id])
+            ->one();
+    }
 }
