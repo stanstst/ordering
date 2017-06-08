@@ -8,7 +8,18 @@
 
 namespace app\domain\order;
 
+use app\models\Order;
+
 class Creator
 {
 
+    public function __construct()
+    {
+
+    }
+
+    public static function instance()
+    {
+        return new static();
+    }
 }
