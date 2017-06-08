@@ -8,11 +8,17 @@ use yii\grid\GridView;
 /* @var $products [] */
 /* @var $users [] */
 /* @var $filtersState [] */
+/* @var $errors [] */
 /* @var $order \app\models\Order */
 
 $this->title = 'Orders';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
+<div>
+    <?php foreach ($errors as $error) { ?>
+        <p style="color: #b92c28"><?php echo htmlentities($error); ?></p>
+    <?php } ?>
+</div>
 <div class="order-index">
 
     <div class="order-create">
@@ -20,7 +26,7 @@ $this->params['breadcrumbs'][] = $this->title;
         <?= $this->render('_form', [
             'model' => $order,
             'products' => $products,
-            'users' =>$users,
+            'users' => $users,
         ]) ?>
 
     </div>
@@ -28,9 +34,9 @@ $this->params['breadcrumbs'][] = $this->title;
     <h3>Filter</h3>
     <p>
         <?= $this->render('_filter', [
-           'products' => $products,
-           'users' =>$users,
-           'filtersState' => $filtersState,
+            'products' => $products,
+            'users' => $users,
+            'filtersState' => $filtersState,
         ]) ?>
     </p>
     <?= GridView::widget([

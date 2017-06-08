@@ -15,10 +15,11 @@ class EntityPersistor
 
     /**
      * @param ActiveRecord $record
+     * @return bool
      */
     public function save(ActiveRecord $record)
     {
-
         $record->save();
+        return $record->hasErrors();
     }
 }

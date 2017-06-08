@@ -12,6 +12,7 @@ use app\components\AssocEntityRepo;
 use app\components\EntityPersistor;
 use app\domain\order\Creator;
 use app\domain\order\PriceCalculatorDiscountProductQuantity;
+use app\domain\order\ViewModel;
 use app\models\Order;
 use app\models\Product;
 use PHPUnit\Framework\TestCase;
@@ -40,6 +41,10 @@ class CreatorTest extends TestCase
      * @var PriceCalculatorDiscountProductQuantity | \PHPUnit_Framework_MockObject_MockObject
      */
     private $priceCalculatorMock;
+    /**
+     * @var ViewModel
+     */
+    private $view;
 
     public function setUp()
     {
@@ -57,13 +62,14 @@ class CreatorTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $this->object = new Creator($this->persistorMock, $this->entityRepo, $this->priceCalculatorMock);
+        $this->view = new ViewModel();
+        $this->object = new Creator($this->persistorMock, $this->entityRepo, $this->priceCalculatorMock, $this->view);
     }
 
     /**
      * @test
      */
-    public function test1()
+    public function setsExpectedOrderAttributesAndCallsSave()
     {
         $productPrice = 1.1;
         $orderCalculatedAttributes = [
@@ -73,7 +79,7 @@ class CreatorTest extends TestCase
         ];
         $this->entityRepo->expects($this->once())
             ->method('getById')
-            ->with(Product::class, $this->orderRequestAttributes['productId'])
+            ->with(Product::tableName(), $this->orderRequestAttributes['productId'])
             ->willReturn(['price' => $productPrice]);
 
         $this->priceCalculatorMock->expects($this->once())
@@ -86,8 +92,21 @@ class CreatorTest extends TestCase
 
         $this->persistorMock->expects($this->once())
             ->method('save')
-            ->with($expectedOrder);
+            ->with($expectedOrder)
+            ->willReturn(true);
 
-        $this->object->create($this->orderRequestAttributes);
+        $this->assertTrue($this->object->create($this->orderRequestAttributes));
+    }
+
+    /**
+     * @test
+     */
+    public function returnsFalseIfUnableToSaveOrder()
+    {
+        $this->persistorMock->expects($this->once())
+            ->method('save')
+            ->willReturn(false);
+
+        $this->assertFalse($this->object->create($this->orderRequestAttributes));
     }
 }

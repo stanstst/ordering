@@ -8,12 +8,12 @@ class m170606_105521_create_order extends Migration
     {
         $this->createTable('order', [
             'id' => $this->primaryKey(),
-            'userId' => $this->integer(),
-            'productId' => $this->integer(),
-            'productPrice' => $this->decimal(7, 2),
-            'quantity' => $this->integer(),
-            'totalPrice'=> $this->decimal(7, 2),
-            'dateCreated'=>$this->timestamp(),
+            'userId' => $this->integer()->notNull(),
+            'productId' => $this->integer()->notNull(),
+            'productPrice' => $this->decimal(7, 2)->notNull(),
+            'quantity' => $this->integer()->notNull(),
+            'totalPrice'=> $this->decimal(7, 2)->notNull(),
+            'dateCreated'=>$this->timestamp()->notNull(),
         ]);
 
         $this->addForeignKey('order_user', 'order', 'userId', 'user', 'id');

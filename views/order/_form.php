@@ -17,11 +17,11 @@ use yii\widgets\ActiveForm;
 
     <?= $form->field($model, 'userId')
         ->label('User')
-        ->dropDownList(DropDown::getUserOptions($users), ['prompt' => '']) ?>
+        ->dropDownList(DropDown::getUserOptions($users)) ?>
 
     <?= $form->field($model, 'productId')
         ->label('Product')
-        ->dropDownList(DropDown::getProductOptions($products), ['prompt' => '']) ?>
+        ->dropDownList(DropDown::getProductOptions($products)) ?>
 
     <?= $form->field($model, 'quantity')
         ->textInput() ?>

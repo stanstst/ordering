@@ -36,12 +36,15 @@ class OrderController extends Controller
      */
     public function actionIndex()
     {
-        if (Yii::$app->request->post()) {
-            Creator::instance()->create(Yii::$app->request->post()['Order']);
-            return $this->redirect(array_merge(['index'], Yii::$app->request->get()));
-        }
+        $viewData = ListPanel::instance()
+            ->loadRecords(Yii::$app->request->get());
+        $creator = Creator::instance($viewData);
 
-        $viewData = ListPanel::instance()->loadRecords(Yii::$app->request->get());
+        if (Yii::$app->request->post()) {
+            if ($creator->create(Yii::$app->request->post()['Order'])) {
+                return $this->redirect(array_merge(['index'], Yii::$app->request->get()));
+            }
+        }
 
         return $this->render('index', (array)$viewData);
     }
@@ -103,7 +106,8 @@ class OrderController extends Controller
      */
     public function actionDelete($id)
     {
-        $this->findModel($id)->delete();
+        $this->findModel($id)
+            ->delete();
 
         return $this->redirect(['index']);
     }

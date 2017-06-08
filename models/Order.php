@@ -34,6 +34,7 @@ class Order extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
+            [['userId', 'productId', 'productPrice', 'quantity', 'totalPrice'], 'required'],
             [['userId', 'productId', 'quantity'], 'integer'],
             [['productPrice', 'totalPrice'], 'number'],
             [['dateCreated'], 'safe'],
