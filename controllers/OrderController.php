@@ -4,6 +4,8 @@ namespace app\controllers;
 
 use app\domain\order\Creator;
 use app\domain\order\ListPanel;
+use app\domain\order\Updater;
+use app\domain\order\ViewModel;
 use Yii;
 use app\models\Order;
 use yii\web\Controller;
@@ -62,24 +64,6 @@ class OrderController extends Controller
     }
 
     /**
-     * Creates a new Order model.
-     * If creation is successful, the browser will be redirected to the 'view' page.
-     * @return mixed
-     */
-    public function actionCreate()
-    {
-        $model = new Order();
-
-        if ($model->load(Yii::$app->request->post()) && $model->save()) {
-            return $this->redirect(['view', 'id' => $model->id]);
-        } else {
-            return $this->render('create', [
-                'model' => $model,
-            ]);
-        }
-    }
-
-    /**
      * Updates an existing Order model.
      * If update is successful, the browser will be redirected to the 'view' page.
      * @param integer $id
@@ -89,18 +73,19 @@ class OrderController extends Controller
     {
         $model = $this->findModel($id);
 
-        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+        $viewData = new ViewModel();
+        $updater = Updater::instance($viewData);
+        $isOrderUpdated = $updater->update($id, Yii::$app->request->post());
+
+        if ($isOrderUpdated) {
             return $this->redirect(['view', 'id' => $model->id]);
         } else {
-            return $this->render('update', [
-                'model' => $model,
-            ]);
+            return $this->render('update', (array)$viewData);
         }
     }
 
     /**
-     * Deletes an existing Order model.
-     * If deletion is successful, the browser will be redirected to the 'index' page.
+     * @todo Delete method must be implemented in the Domain namespace. OrderFinder must be shared across Update and Delete actions.
      * @param integer $id
      * @return mixed
      */
@@ -113,7 +98,6 @@ class OrderController extends Controller
     }
 
     /**
-     * Finds the Order model based on its primary key value.
      * If the model is not found, a 404 HTTP exception will be thrown.
      * @param integer $id
      * @return Order the loaded model

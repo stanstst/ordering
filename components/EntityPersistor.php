@@ -20,6 +20,6 @@ class EntityPersistor
     public function save(ActiveRecord $record)
     {
         $record->save();
-        return $record->hasErrors();
+        return !$record->hasErrors();
     }
 }
