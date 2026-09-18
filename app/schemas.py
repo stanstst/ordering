@@ -22,7 +22,7 @@ class OrderItemOut(BaseModel):
 
 
 class OrderOut(BaseModel):
-    id: int
+    id: str
     customer_id: str
     status: str
     items: List[OrderItemOut]

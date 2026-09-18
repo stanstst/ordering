@@ -1,3 +1,6 @@
+import json
+import uuid
+
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
@@ -19,13 +22,33 @@ def create_order(order_in: schemas.OrderCreate, db: Session = Depends(get_db)):
             status_code=422, detail="Order must contain at least one item"
         )
 
-    order = models.Order(customer_id=order_in.customer_id, status="PENDING")
+    order = models.Order(
+        id=str(uuid.uuid4()), customer_id=order_in.customer_id, status="PENDING"
+    )
     for item in order_in.items:
         order.items.append(
             models.OrderItem(product_id=item.product_id, quantity=item.quantity)
         )
 
     db.add(order)
+
+    outbox_payload = {
+        "order_id": order.id,
+        "customer_id": order.customer_id,
+        "items": [
+            {"product_id": item.product_id, "quantity": item.quantity}
+            for item in order.items
+        ],
+    }
+    outbox_message = models.OutboxMessage(
+        aggregate_type="Order",
+        aggregate_ref_id=f"order-{order.id}",
+        event_type="OrderCreated",
+        payload=json.dumps(outbox_payload),
+        status="pending",
+    )
+    db.add(outbox_message)
+
     db.commit()
     db.refresh(order)
 

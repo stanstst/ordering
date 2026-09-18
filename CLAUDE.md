@@ -18,3 +18,14 @@ POST /orders
 }
 ```
 
+## Outbox messaging example
+```json
+{
+  "id": "uuid",
+  "aggregate_type": "Order",
+  "aggregate_ref_id": "order-123",
+  "event_type": "OrderCreated",
+  "payload": "{}",
+  "status": "pending"
+}
+```
