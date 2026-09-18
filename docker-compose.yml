@@ -1,0 +1,34 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: orders_db
+      MYSQL_USER: orders_user
+      MYSQL_PASSWORD: orders_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build: .
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: mysql+pymysql://orders_user:orders_password@db:3306/orders_db
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
