@@ -30,5 +30,52 @@ services:
       db:
         condition: service_healthy
 
+  kafka:
+    image: apache/kafka:3.8.0
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # Single-node "KRaft" mode: this one container is both the broker
+      # (handles messages) and the controller (cluster metadata) - no
+      # separate Zookeeper container needed, unlike older Kafka setups.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      # Other containers reach Kafka at "kafka:9092" (the compose service
+      # name), since this is what clients are told to connect to.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  publisher:
+    build:
+      context: .
+      dockerfile: publisher/Dockerfile
+    environment:
+      DATABASE_URL: mysql+pymysql://orders_user:orders_password@db:3306/orders_db
+      KAFKA_BROKER: kafka:9092
+      KAFKA_TOPIC: order-events
+    volumes:
+      - ./app:/app/app
+      - ./publisher:/app/publisher
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
 volumes:
   mysql_data:
