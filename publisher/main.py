@@ -36,11 +36,19 @@ def build_kafka_message(outbox_row: OutboxMessage) -> dict:
 def publish_pending_batch(producer: KafkaProducer, db) -> int:
     # .query(...).filter(...).order_by(...).limit(...) builds a SELECT
     # statement piece by piece; .all() is what actually runs it.
+    #
+    # with_for_update(skip_locked=True) turns it into
+    # "SELECT ... FOR UPDATE SKIP LOCKED": each row returned gets locked
+    # for this transaction, and rows already locked by another publisher
+    # replica's in-flight batch are silently skipped instead of returned.
+    # That's what lets multiple publisher instances poll concurrently
+    # without two of them grabbing (and re-publishing) the same row.
     pending_rows = (
         db.query(OutboxMessage)
         .filter(OutboxMessage.status == "pending")
         .order_by(OutboxMessage.created_at)
         .limit(BATCH_SIZE)
+        .with_for_update(skip_locked=True)
         .all()
     )
 
