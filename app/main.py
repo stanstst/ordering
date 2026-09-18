@@ -4,8 +4,9 @@ import uuid
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
-from app import models, schemas
-from app.database import Base, engine, get_db
+from app import schemas
+from shared import models
+from shared.database import Base, engine, get_db
 
 Base.metadata.create_all(bind=engine)
 

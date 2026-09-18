@@ -5,8 +5,8 @@ import time
 
 from kafka import KafkaProducer
 
-from app.database import SessionLocal
-from app.models import OutboxMessage
+from shared.database import SessionLocal
+from shared.models import OutboxMessage
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("outbox-publisher")

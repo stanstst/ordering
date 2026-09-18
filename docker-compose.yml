@@ -26,6 +26,7 @@ services:
       DATABASE_URL: mysql+pymysql://orders_user:orders_password@db:3306/orders_db
     volumes:
       - ./app:/app/app
+      - ./shared:/app/shared
     depends_on:
       db:
         condition: service_healthy
@@ -69,7 +70,7 @@ services:
       KAFKA_BROKER: kafka:9092
       KAFKA_TOPIC: order-events
     volumes:
-      - ./app:/app/app
+      - ./shared:/app/shared
       - ./publisher:/app/publisher
     depends_on:
       db:

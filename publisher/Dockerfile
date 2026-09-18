@@ -5,7 +5,7 @@ WORKDIR /app
 COPY publisher/requirements.txt ./publisher/requirements.txt
 RUN pip install --no-cache-dir -r publisher/requirements.txt
 
-COPY app ./app
+COPY shared ./shared
 COPY publisher ./publisher
 
 CMD ["python", "-m", "publisher.main"]
