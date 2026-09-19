@@ -26,12 +26,26 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: mysql+pymysql://orders_user:orders_password@db:3306/orders_db
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - ./app:/app/app
       - ./shared:/app/shared
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   kafka:
     image: apache/kafka:3.8.0
