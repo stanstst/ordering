@@ -61,3 +61,15 @@ _Kafka message example_
   }
 }
 ```
+
+## Inventory reservation process
+Inventory reservation process is done async. For the moment symilated by dummy API call, that sleeps from 3 to 5 seconds.
+It updates a column `status` = _accepted_ orders `table`
+
+## Payment process
+Payment approval process is done async. For the moment symilated by dummy API call, that sleeps from 3 to 5 seconds.
+It updates a column `payment_status` = _accepted_ orders `table`
+
+
+## Order Process
+After **Inventory reservation** process and **Payment process** are completed `order.status` = _processing_

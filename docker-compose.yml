@@ -94,5 +94,22 @@ services:
       kafka:
         condition: service_healthy
 
+  inventory:
+    build:
+      context: .
+      dockerfile: inventory/Dockerfile
+    environment:
+      DATABASE_URL: mysql+pymysql://orders_user:orders_password@db:3306/orders_db
+      KAFKA_BROKER: kafka:9092
+      KAFKA_TOPIC: order-events
+    volumes:
+      - ./shared:/app/shared
+      - ./inventory:/app/inventory
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
 volumes:
   mysql_data:
