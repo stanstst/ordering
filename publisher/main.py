@@ -54,10 +54,12 @@ def publish_pending_batch(producer: KafkaProducer, db) -> int:
 
     for row in pending_rows:
         message = build_kafka_message(row)
-        # Same key (aggregate_ref_id) always lands on the same Kafka
-        # partition, so events for one order stay in order.
+        headers = [("event_type", row.event_type.encode("utf-8"))]
         producer.send(
-            KAFKA_TOPIC, key=row.aggregate_ref_id.encode("utf-8"), value=message
+            KAFKA_TOPIC,
+            key=row.aggregate_ref_id.encode("utf-8"),
+            value=message,
+            headers=headers,
         )
         logger.info(json.dumps(message))
         row.status = "sent"
