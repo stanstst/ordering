@@ -1,0 +1,4 @@
+sqlalchemy
+pymysql
+cryptography
+kafka-python
