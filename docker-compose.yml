@@ -128,5 +128,18 @@ services:
       kafka:
         condition: service_healthy
 
+  processor:
+    build:
+      context: .
+      dockerfile: status_processor/Dockerfile
+    environment:
+      DATABASE_URL: mysql+pymysql://orders_user:orders_password@db:3306/orders_db
+    volumes:
+      - ./shared:/app/shared
+      - ./status_processor:/app/status_processor
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   mysql_data:
