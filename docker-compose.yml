@@ -102,6 +102,9 @@ services:
       DATABASE_URL: mysql+pymysql://orders_user:orders_password@db:3306/orders_db
       KAFKA_BROKER: kafka:9092
       KAFKA_TOPIC: order-events
+      REDIS_URL: redis://redis:6379/0
+      # Set to e.g. "1" to simulate an Inventory API outage and trip the circuit breaker.
+      INVENTORY_API_FAILURE_RATE: "0"
     volumes:
       - ./shared:/app/shared
       - ./inventory:/app/inventory
@@ -109,6 +112,8 @@ services:
       db:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   payment:
