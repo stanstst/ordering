@@ -22,6 +22,10 @@ class CircuitBreaker:
       tripped  - set together with "open", no expiry. "tripped" present but
                  "open" already expired means the cooldown is over -> HALF-OPEN
       probe    - lock so only one replica sends the HALF-OPEN test call
+
+    Only errors without an HTTP status (network, timeout) or with a 5xx
+    status count as failures. Errors with a 4xx status_code are re-raised
+    without being counted.
     """
 
     def __init__(
@@ -62,14 +66,29 @@ class CircuitBreaker:
 
         try:
             result = func(*args)
-        except Exception:
-            self._record_failure(state)
+        except Exception as error:
+            if self._counts_as_failure(error):
+                self._record_failure(state)
+            else:
+                # A 4xx means the API answered - it is up, only this request
+                # was wrong. Treat it like a success for the circuit's health.
+                self._record_success(state)
             # A bare "raise" re-raises the exception we just caught, so the
             # caller still sees the original error.
             raise
 
         self._record_success(state)
         return result
+
+    def _counts_as_failure(self, error: Exception) -> bool:
+        # getattr(obj, "name", default) reads an attribute, or returns the
+        # default when the object doesn't have it.
+        status_code = getattr(error, "status_code", None)
+        if status_code is None:
+            # No HTTP response at all: network error, timeout, ...
+            return True
+        # 5xx = the API is unhealthy -> count. 4xx = our request was wrong -> skip.
+        return status_code >= 500
 
     def _current_state(self) -> str:
         try:
@@ -129,7 +148,7 @@ class CircuitBreaker:
 
         try:
             self.redis.delete(self.failures_key, self.tripped_key, self.probe_key)
-            logger.info("Circuit %s CLOSED: probe call succeeded", self.name)
+            logger.info("Circuit %s CLOSED: API answered the probe call", self.name)
         except redis.RedisError:
             logger.warning("Circuit %s: Redis unavailable, could not close", self.name)
 
