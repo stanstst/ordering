@@ -1,0 +1,6 @@
+# Everything the app needs, plus the test tools.
+# "-r file" includes another requirements file.
+-r requirements.txt
+pytest
+# FastAPI's TestClient is built on httpx.
+httpx

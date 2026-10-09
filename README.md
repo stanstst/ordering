@@ -49,3 +49,11 @@ curl -X POST localhost:8000/orders \
   -H 'Content-Type: application/json' -H 'Idempotency-Key: abc-1' \
   -d '{"customer_id":"123","items":[{"product_id":"ABC","quantity":2}]}'
 ```
+
+## Tests
+
+Feature tests for the API live in `app/tests/`. They call the FastAPI app in-process (FastAPI's `TestClient`, like Laravel's `$this->post()`) against a separate MySQL database `orders_test` and Redis database 1. Tables are emptied after every test.
+
+```bash
+docker compose run --rm api python -m pytest app/tests -v
+```
