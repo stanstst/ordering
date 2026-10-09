@@ -57,3 +57,14 @@ Feature tests for the API live in `app/tests/`. They call the FastAPI app in-pro
 ```bash
 docker compose run --rm api python -m pytest app/tests -v
 ```
+
+## Local libraries for the IDE
+
+Install, or update after any `requirements.txt` changes:
+
+```bash
+.venv/bin/python -m pip install -r app/requirements-dev.txt -r publisher/requirements.txt \
+  -r inventory/requirements.txt -r payment/requirements.txt -r status_processor/requirements.txt
+```
+
+PyCharm: **Settings → Project → Python Interpreter → Add Interpreter → Add Local Interpreter → Virtualenv Environment → Existing** → select `.venv/bin/python`.
