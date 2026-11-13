@@ -5,15 +5,19 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
 TEST_DATABASE_NAME = "orders_test"
+TEST_DATABASE_USER = "orders_user"
+TEST_DATABASE_URL = (
+    f"mysql+pymysql://{TEST_DATABASE_USER}:orders_password@db:3306/{TEST_DATABASE_NAME}"
+)
+# Same Redis server, but logical database 1 instead of 0, so tests never
+# touch the app's data.
+TEST_REDIS_URL = "redis://redis:6379/1"
 MYSQL_ADMIN_URL = os.environ.get(
     "TEST_MYSQL_ADMIN_URL", "mysql+pymysql://root:root_password@db:3306"
 )
 
-os.environ["DATABASE_URL"] = (
-    f"mysql+pymysql://orders_user:orders_password@db:3306/{TEST_DATABASE_NAME}"
-)
-# Same Redis server, but logical database 1 instead of 0, so tests never
-os.environ["REDIS_URL"] = "redis://redis:6379/1"
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["REDIS_URL"] = TEST_REDIS_URL
 
 
 @pytest.fixture(scope="session")
@@ -24,7 +28,7 @@ def test_engine():
     with admin_engine.begin() as connection:
         connection.exec_driver_sql(f"CREATE DATABASE IF NOT EXISTS {TEST_DATABASE_NAME}")
         connection.exec_driver_sql(
-            f"GRANT ALL PRIVILEGES ON {TEST_DATABASE_NAME}.* TO 'orders_user'@'%%'"
+            f"GRANT ALL PRIVILEGES ON {TEST_DATABASE_NAME}.* TO '{TEST_DATABASE_USER}'@'%%'"
         )
     admin_engine.dispose()
 

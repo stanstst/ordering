@@ -8,6 +8,8 @@ from kafka import KafkaConsumer
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 
 from shared.database import SessionLocal
+from shared.enums import EventType, StepName, StepStatus
+from shared.messaging import EVENT_TYPE_HEADER, MESSAGE_ENCODING
 from shared.models import OrderStepResult
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -17,8 +19,6 @@ KAFKA_BROKER = os.environ.get("KAFKA_BROKER", "kafka:9092")
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "order-events")
 CONSUMER_GROUP = "payment-service"
 
-# Standing in for real network latency to an external Payment API that
-# doesn't exist yet - a random one of these is picked per call.
 SIMULATED_API_LATENCY_SECONDS = [1, 2, 3]
 
 
@@ -40,14 +40,14 @@ def process_order_created(db_session, event: dict) -> None:
     message_id = event["id"]
 
     is_successful = call_payment_api(order_id, items)
-    status = "success" if is_successful else "failed"
+    status = StepStatus.SUCCESS if is_successful else StepStatus.FAILED
 
     # "INSERT ... ON DUPLICATE KEY UPDATE" - MySQL's atomic upsert. Inserts
     # a new (order_id, "payment") row, or updates it in place if one
     # already exists - makes this idempotent under Kafka's at-least-once
     # redelivery without a separate SELECT-then-write race.
     upsert_statement = mysql_insert(OrderStepResult).values(
-        order_id=order_id, step="payment", status=status, message_id=message_id
+        order_id=order_id, step=StepName.PAYMENT, status=status, message_id=message_id
     )
     upsert_statement = upsert_statement.on_duplicate_key_update(
         status=upsert_statement.inserted.status, message_id=upsert_statement.inserted.message_id
@@ -86,14 +86,14 @@ def main():
 
     for record in consumer:
         headers = dict(record.headers or [])
-        event_type = headers.get("event_type", b"").decode("utf-8")
-        if event_type != "OrderCreated":
+        event_type = headers.get(EVENT_TYPE_HEADER, b"").decode(MESSAGE_ENCODING)
+        if event_type != EventType.ORDER_CREATED:
             # Cheap filter: skip anything that isn't OrderCreated without
             # even parsing the JSON value.
             consumer.commit()
             continue
 
-        event = json.loads(record.value.decode("utf-8"))
+        event = json.loads(record.value.decode(MESSAGE_ENCODING))
         db_session = SessionLocal()
         try:
             process_order_created(db_session, event)

@@ -5,6 +5,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from shared.database import Base
+from shared.enums import OrderStatus, OutboxStatus
 
 
 class Order(Base):
@@ -12,7 +13,7 @@ class Order(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     customer_id = Column(String(64), nullable=False)
-    status = Column(String(32), nullable=False, default="PENDING")
+    status = Column(String(32), nullable=False, default=OrderStatus.PENDING)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     items = relationship(
@@ -39,7 +40,7 @@ class OutboxMessage(Base):
     aggregate_ref_id = Column(String(64), nullable=False)
     event_type = Column(String(64), nullable=False)
     payload = Column(Text, nullable=False)
-    status = Column(String(32), nullable=False, default="pending")
+    status = Column(String(32), nullable=False, default=OutboxStatus.PENDING)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -50,8 +51,8 @@ class OrderStepResult(Base):
     # step="inventory" rows, Payment only ever writes step="payment" rows,
     # so the two never contend for the same row.
     order_id = Column(String(36), ForeignKey("orders.id"), primary_key=True)
-    step = Column(String(16), primary_key=True)  # "inventory" | "payment"
-    status = Column(String(16), nullable=False)  # "success" | "failed"
+    step = Column(String(16), primary_key=True)  # StepName
+    status = Column(String(16), nullable=False)  # StepStatus
     # The CloudEvents "id" of the Kafka message that produced this result -
     # not a business field, just a breadcrumb back to the exact message for
     # tracing/debugging (e.g. "grep this id in the inventory service logs").

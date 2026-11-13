@@ -1,12 +1,18 @@
 import logging
+from enum import StrEnum
 
 import redis
 
 logger = logging.getLogger("inventory-service")
 
-CLOSED = "closed"
-OPEN = "open"
-HALF_OPEN = "half_open"
+DEFAULT_PROBE_TIMEOUT_SECONDS = 10
+SERVER_ERROR_MIN_STATUS = 500
+
+
+class CircuitState(StrEnum):
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
 
 
 class CircuitOpenError(Exception):
@@ -35,7 +41,7 @@ class CircuitBreaker:
         failure_threshold: int,
         failure_window_seconds: int,
         cooldown_seconds: int,
-        probe_timeout_seconds: int = 10,
+        probe_timeout_seconds: int = DEFAULT_PROBE_TIMEOUT_SECONDS,
     ):
         prefix = f"circuit:{name}:"
         self.failures_key = prefix + "failures"
@@ -56,10 +62,10 @@ class CircuitBreaker:
         # call(f, a, b) ends up running f(a, b).
         state = self._get_current_state()
 
-        if state == OPEN:
+        if state == CircuitState.OPEN:
             raise CircuitOpenError(f"circuit {self.name} is open")
 
-        if state == HALF_OPEN:
+        if state == CircuitState.HALF_OPEN:
             if not self._claim_probe():
                 # Another replica is already sending the test call.
                 raise CircuitOpenError(f"circuit {self.name} is half-open, probe in progress")
@@ -89,20 +95,20 @@ class CircuitBreaker:
             # No HTTP response at all: network error, timeout, ...
             return True
         # 5xx = the API is unhealthy -> count. 4xx = our request was wrong -> skip.
-        return status_code >= 500
+        return status_code >= SERVER_ERROR_MIN_STATUS
 
-    def _get_current_state(self) -> str:
+    def _get_current_state(self) -> CircuitState:
         try:
             if self.redis.exists(self.open_key):
-                return OPEN
+                return CircuitState.OPEN
             if self.redis.exists(self.tripped_key):
-                return HALF_OPEN
-            return CLOSED
+                return CircuitState.HALF_OPEN
+            return CircuitState.CLOSED
         except redis.RedisError:
             # Fail open: if Redis is down we can't know the state, so keep
             # calling the API rather than letting the breaker block everything.
             logger.warning("Circuit %s: Redis unavailable, allowing call", self.name)
-            return CLOSED
+            return CircuitState.CLOSED
 
     def _claim_probe(self) -> bool:
         try:
@@ -117,9 +123,9 @@ class CircuitBreaker:
             logger.warning("Circuit %s: Redis unavailable, allowing probe", self.name)
             return True
 
-    def _record_failure(self, state: str) -> None:
+    def _record_failure(self, state: CircuitState) -> None:
         try:
-            if state == HALF_OPEN:
+            if state == CircuitState.HALF_OPEN:
                 self._open("probe call failed")
                 return
 
@@ -143,8 +149,8 @@ class CircuitBreaker:
         except redis.RedisError:
             logger.warning("Circuit %s: Redis unavailable, failure not recorded", self.name)
 
-    def _record_success(self, state: str) -> None:
-        if state != HALF_OPEN:
+    def _record_success(self, state: CircuitState) -> None:
+        if state != CircuitState.HALF_OPEN:
             return
 
         try:

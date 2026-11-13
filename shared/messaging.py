@@ -1,0 +1,3 @@
+EVENT_TYPE_HEADER = "event_type"
+
+MESSAGE_ENCODING = "utf-8"

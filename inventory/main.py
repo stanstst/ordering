@@ -8,8 +8,14 @@ import redis
 from kafka import KafkaConsumer, TopicPartition
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 
-from inventory.circuit_breaker import CircuitBreaker, CircuitOpenError
+from inventory.circuit_breaker import (
+    SERVER_ERROR_MIN_STATUS,
+    CircuitBreaker,
+    CircuitOpenError,
+)
 from shared.database import SessionLocal
+from shared.enums import EventType, StepName, StepStatus
+from shared.messaging import EVENT_TYPE_HEADER, MESSAGE_ENCODING
 from shared.models import OrderStepResult
 from shared.redis_client import redis_client
 
@@ -22,26 +28,29 @@ CONSUMER_GROUP = "inventory-service"
 
 INVENTORY_API_FAILURE_RATE = 1 / 3
 INVENTORY_API_FAILURE_STATUS = 503
+# Standing in for real network latency - a random one is picked per call.
+SIMULATED_API_LATENCY_SECONDS = [1, 2, 3]
+# HTTP statuses from 400 up to SERVER_ERROR_MIN_STATUS are client errors.
+CLIENT_ERROR_MIN_STATUS = 400
 
-# How long to wait before retrying the same message.
+BREAKER_FAILURE_THRESHOLD = 5
+BREAKER_FAILURE_WINDOW_SECONDS = 60
+BREAKER_COOLDOWN_SECONDS = 30
+
 CIRCUIT_OPEN_RETRY_SECONDS = 5
 API_ERROR_RETRY_SECONDS = 2
 
-# Unexpected errors (DB error, bad payload, bug, ...): retry the same message
-# with growing waits (2s, 4s, 8s, 16s), then give up - record the step as
-# failed and commit, so one bad message can't block its partition forever.
 MAX_ATTEMPTS = 5
 ERROR_RETRY_BASE_SECONDS = 2
-# Attempt counters live in Redis; the TTL cleans up counters of messages
-# that later succeeded.
 ATTEMPT_COUNTER_TTL_SECONDS = 60 * 60
+ATTEMPT_COUNTER_KEY_PREFIX = "retry:inventory:"
 
 inventory_api_breaker = CircuitBreaker(
     name="inventory-api",
     redis_client=redis_client,
-    failure_threshold=5,
-    failure_window_seconds=60,
-    cooldown_seconds=30,
+    failure_threshold=BREAKER_FAILURE_THRESHOLD,
+    failure_window_seconds=BREAKER_FAILURE_WINDOW_SECONDS,
+    cooldown_seconds=BREAKER_COOLDOWN_SECONDS,
 )
 
 
@@ -63,13 +72,13 @@ class InventoryApiError(Exception):
     """
 
     def __init__(self, message: str, status_code: int | None = None):
-        # super().__init__ runs the parent class (Exception) constructor,
-        # so str(error) still returns the message.
         super().__init__(message)
         self.status_code = status_code
 
     def is_client_error(self) -> bool:
-        return self.status_code is not None and 400 <= self.status_code < 500
+        if self.status_code is None:
+            return False
+        return CLIENT_ERROR_MIN_STATUS <= self.status_code < SERVER_ERROR_MIN_STATUS
 
 
 def call_inventory_api(order_id: str, items: list) -> bool:
@@ -78,8 +87,7 @@ def call_inventory_api(order_id: str, items: list) -> bool:
     No local stock tracking anymore - always "succeeds" after a simulated
     delay. Swap this for an actual request once that service exists.
     """
-    time.sleep(random.choice([1, 2, 3]))
-    # random.random() returns a float in [0.0, 1.0), so "< 1 / 3" is true
+    time.sleep(random.choice(SIMULATED_API_LATENCY_SECONDS))
     if random.random() < INVENTORY_API_FAILURE_RATE:
         raise InventoryApiError(
             f"simulated Inventory API error {INVENTORY_API_FAILURE_STATUS}",
@@ -103,14 +111,14 @@ def process_order_created(db_session, event: dict) -> None:
             raise
         logger.warning("Inventory API rejected order %s: %s", order_id, error)
         is_successful = False
-    status = "success" if is_successful else "failed"
+    status = StepStatus.SUCCESS if is_successful else StepStatus.FAILED
 
     record_step_result(db_session, order_id, status, message_id)
 
 
 def record_step_result(db_session, order_id: str, status: str, message_id: str) -> None:
     upsert_statement = mysql_insert(OrderStepResult).values(
-        order_id=order_id, step="inventory", status=status, message_id=message_id
+        order_id=order_id, step=StepName.INVENTORY, status=status, message_id=message_id
     )
     upsert_statement = upsert_statement.on_duplicate_key_update(
         status=upsert_statement.inserted.status, message_id=upsert_statement.inserted.message_id
@@ -139,7 +147,9 @@ def retry_later(consumer, record, retry_seconds: int) -> None:
 def increment_attempt_count(record) -> int:
     # topic + partition + offset identifies a Kafka message exactly, even
     # when its JSON can't be parsed.
-    attempt_counter_key = f"retry:inventory:{record.topic}:{record.partition}:{record.offset}"
+    attempt_counter_key = (
+        f"{ATTEMPT_COUNTER_KEY_PREFIX}{record.topic}:{record.partition}:{record.offset}"
+    )
     try:
         attempt = redis_client.incr(attempt_counter_key)
         redis_client.expire(attempt_counter_key, ATTEMPT_COUNTER_TTL_SECONDS)
@@ -171,7 +181,7 @@ def give_up(db_session, consumer, record, event) -> None:
 
     try:
         # A failed inventory step makes the status processor cancel the order.
-        record_step_result(db_session, order_id, "failed", event.get("id"))
+        record_step_result(db_session, order_id, StepStatus.FAILED, event.get("id"))
         consumer.commit()
         logger.error("Gave up on order %s after %d attempts", order_id, MAX_ATTEMPTS)
     except Exception:
@@ -204,8 +214,8 @@ def main():
 
     for record in consumer:
         headers = dict(record.headers or [])
-        event_type = headers.get("event_type", b"").decode("utf-8")
-        if event_type != "OrderCreated":
+        event_type = headers.get(EVENT_TYPE_HEADER, b"").decode(MESSAGE_ENCODING)
+        if event_type != EventType.ORDER_CREATED:
             # Cheap filter: skip anything that isn't OrderCreated without
             # even parsing the JSON value.
             consumer.commit()
@@ -216,7 +226,7 @@ def main():
         try:
             # Parsed inside the try, so a malformed message goes through the
             # capped retry below instead of crashing the whole consumer.
-            event = json.loads(record.value.decode("utf-8"))
+            event = json.loads(record.value.decode(MESSAGE_ENCODING))
             process_order_created(db_session, event)
             consumer.commit()
         except (CircuitOpenError, InventoryApiError) as error:

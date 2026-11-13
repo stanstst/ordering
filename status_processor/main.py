@@ -5,13 +5,17 @@ import time
 from sqlalchemy import and_, exists, or_
 
 from shared.database import SessionLocal
+from shared.enums import OrderStatus, StepName, StepStatus
 from shared.models import Order, OrderStepResult
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("order-processor")
 
 BATCH_SIZE = 100
-POLL_INTERVAL_SECONDS = int(os.environ.get("POLL_INTERVAL_SECONDS", "5"))
+DEFAULT_POLL_INTERVAL_SECONDS = "5"
+POLL_INTERVAL_SECONDS = int(
+    os.environ.get("POLL_INTERVAL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS)
+)
 
 
 def step_has_status(step_name, status):
@@ -35,9 +39,9 @@ def advance_ready_orders(db_session) -> int:
     ready_orders = (
         db_session.query(Order)
         .filter(
-            Order.status == "PENDING",
-            step_has_status("inventory", "success"),
-            step_has_status("payment", "success"),
+            Order.status == OrderStatus.PENDING,
+            step_has_status(StepName.INVENTORY, StepStatus.SUCCESS),
+            step_has_status(StepName.PAYMENT, StepStatus.SUCCESS),
         )
         .order_by(Order.created_at)
         .limit(BATCH_SIZE)
@@ -46,7 +50,7 @@ def advance_ready_orders(db_session) -> int:
     )
 
     for order in ready_orders:
-        order.status = "DELIVERY"
+        order.status = OrderStatus.DELIVERY
         logger.info("Order %s -> DELIVERY", order.id)
 
     db_session.commit()
@@ -54,15 +58,13 @@ def advance_ready_orders(db_session) -> int:
 
 
 def cancel_failed_orders(db_session) -> int:
-    # An order with any failed step can never become ready, so take it out
-    # of PENDING instead of leaving it there forever.
     failed_orders = (
         db_session.query(Order)
         .filter(
-            Order.status == "PENDING",
+            Order.status == OrderStatus.PENDING,
             or_(
-                step_has_status("inventory", "failed"),
-                step_has_status("payment", "failed"),
+                step_has_status(StepName.INVENTORY, StepStatus.FAILED),
+                step_has_status(StepName.PAYMENT, StepStatus.FAILED),
             ),
         )
         .order_by(Order.created_at)
@@ -72,7 +74,7 @@ def cancel_failed_orders(db_session) -> int:
     )
 
     for order in failed_orders:
-        order.status = "CANCELLED"
+        order.status = OrderStatus.CANCELLED
         logger.info("Order %s -> CANCELLED (a step failed)", order.id)
 
     db_session.commit()
