@@ -28,12 +28,12 @@ def step_has_status(step_name, status):
     )
 
 
-def advance_ready_orders(db) -> int:
+def advance_ready_orders(db_session) -> int:
     # Same FOR UPDATE SKIP LOCKED batching as publisher/main.py - lets
     # multiple processor replicas run concurrently without two of them
     # grabbing (and double-processing) the same order.
     ready_orders = (
-        db.query(Order)
+        db_session.query(Order)
         .filter(
             Order.status == "PENDING",
             step_has_status("inventory", "success"),
@@ -49,15 +49,15 @@ def advance_ready_orders(db) -> int:
         order.status = "DELIVERY"
         logger.info("Order %s -> DELIVERY", order.id)
 
-    db.commit()
+    db_session.commit()
     return len(ready_orders)
 
 
-def cancel_failed_orders(db) -> int:
+def cancel_failed_orders(db_session) -> int:
     # An order with any failed step can never become ready, so take it out
     # of PENDING instead of leaving it there forever.
     failed_orders = (
-        db.query(Order)
+        db_session.query(Order)
         .filter(
             Order.status == "PENDING",
             or_(
@@ -75,13 +75,13 @@ def cancel_failed_orders(db) -> int:
         order.status = "CANCELLED"
         logger.info("Order %s -> CANCELLED (a step failed)", order.id)
 
-    db.commit()
+    db_session.commit()
     return len(failed_orders)
 
 
-def process_pending_batch(db) -> int:
-    advanced_count = advance_ready_orders(db)
-    cancelled_count = cancel_failed_orders(db)
+def process_pending_batch(db_session) -> int:
+    advanced_count = advance_ready_orders(db_session)
+    cancelled_count = cancel_failed_orders(db_session)
     return advanced_count + cancelled_count
 
 
@@ -93,16 +93,16 @@ def main():
     )
 
     while True:
-        db = SessionLocal()
+        db_session = SessionLocal()
         try:
-            updated_count = process_pending_batch(db)
+            updated_count = process_pending_batch(db_session)
             if updated_count:
                 logger.info("Updated %d order(s)", updated_count)
         except Exception:
             logger.exception("Failed to process pending orders batch")
-            db.rollback()
+            db_session.rollback()
         finally:
-            db.close()
+            db_session.close()
 
         time.sleep(POLL_INTERVAL_SECONDS)
 

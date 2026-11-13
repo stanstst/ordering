@@ -88,7 +88,7 @@ def call_inventory_api(order_id: str, items: list) -> bool:
     return True
 
 
-def process_order_created(db, event: dict) -> None:
+def process_order_created(db_session, event: dict) -> None:
     order_id = event["data"]["order_id"]
     items = event["data"]["items"]
     message_id = event["id"]
@@ -105,10 +105,10 @@ def process_order_created(db, event: dict) -> None:
         is_successful = False
     status = "success" if is_successful else "failed"
 
-    record_step_result(db, order_id, status, message_id)
+    record_step_result(db_session, order_id, status, message_id)
 
 
-def record_step_result(db, order_id: str, status: str, message_id: str) -> None:
+def record_step_result(db_session, order_id: str, status: str, message_id: str) -> None:
     upsert_statement = mysql_insert(OrderStepResult).values(
         order_id=order_id, step="inventory", status=status, message_id=message_id
     )
@@ -116,8 +116,8 @@ def record_step_result(db, order_id: str, status: str, message_id: str) -> None:
         status=upsert_statement.inserted.status, message_id=upsert_statement.inserted.message_id
     )
 
-    db.execute(upsert_statement)
-    db.commit()
+    db_session.execute(upsert_statement)
+    db_session.commit()
 
     logger.info(
         "Recorded inventory step result for order %s: %s (message_id=%s)",
@@ -156,7 +156,7 @@ def get_order_id(event) -> str | None:
     return event.get("data", {}).get("order_id")
 
 
-def give_up(db, consumer, record, event) -> None:
+def give_up(db_session, consumer, record, event) -> None:
     order_id = get_order_id(event)
 
     if order_id is None:
@@ -171,13 +171,13 @@ def give_up(db, consumer, record, event) -> None:
 
     try:
         # A failed inventory step makes the status processor cancel the order.
-        record_step_result(db, order_id, "failed", event.get("id"))
+        record_step_result(db_session, order_id, "failed", event.get("id"))
         consumer.commit()
         logger.error("Gave up on order %s after %d attempts", order_id, MAX_ATTEMPTS)
     except Exception:
         # Couldn't even record the failure (e.g. DB down). Don't skip the
         # message - that would leave the order PENDING forever. Keep retrying.
-        db.rollback()
+        db_session.rollback()
         logger.exception("Could not mark order %s as failed, retrying", order_id)
         retry_later(consumer, record, ERROR_RETRY_BASE_SECONDS)
 
@@ -212,17 +212,17 @@ def main():
             continue
 
         event = None
-        db = SessionLocal()
+        db_session = SessionLocal()
         try:
             # Parsed inside the try, so a malformed message goes through the
             # capped retry below instead of crashing the whole consumer.
             event = json.loads(record.value.decode("utf-8"))
-            process_order_created(db, event)
+            process_order_created(db_session, event)
             consumer.commit()
         except (CircuitOpenError, InventoryApiError) as error:
             # API outage: retry without a cap - the circuit breaker keeps
             # these retries cheap, and an outage shouldn't cancel orders.
-            db.rollback()
+            db_session.rollback()
             if isinstance(error, CircuitOpenError):
                 retry_seconds = CIRCUIT_OPEN_RETRY_SECONDS
             else:
@@ -235,7 +235,7 @@ def main():
             )
             retry_later(consumer, record, retry_seconds)
         except Exception:
-            db.rollback()
+            db_session.rollback()
             attempt = increment_attempt_count(record)
             if attempt < MAX_ATTEMPTS:
                 # ** is "to the power of": 2 * 2**0, 2 * 2**1, ... = 2, 4, 8, 16
@@ -255,9 +255,9 @@ def main():
                     attempt,
                     MAX_ATTEMPTS,
                 )
-                give_up(db, consumer, record, event)
+                give_up(db_session, consumer, record, event)
         finally:
-            db.close()
+            db_session.close()
 
 
 if __name__ == "__main__":

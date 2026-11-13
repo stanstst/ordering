@@ -16,11 +16,11 @@ Base = declarative_base()
 
 
 def get_db():
-    db = SessionLocal()
+    db_session = SessionLocal()
     try:
-        yield db
+        yield db_session
     except Exception:
-        db.rollback()
+        db_session.rollback()
         raise
     finally:
-        db.close()
+        db_session.close()

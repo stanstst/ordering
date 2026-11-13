@@ -28,7 +28,7 @@ def get_health_status():
 @app.post("/orders", response_model=schemas.OrderOut, status_code=201)
 def create_order(
     order_request: schemas.OrderCreate,
-    db: Session = Depends(get_db),
+    db_session: Session = Depends(get_db),
     idempotency_key: str = Header(alias="Idempotency-Key"),
 ):
     if not order_request.items:
@@ -65,7 +65,7 @@ def create_order(
                 status_code=409,
                 detail="Idempotency-Key was already used with a different request body",
             )
-        return db.get(models.Order, existing_claim["order_id"])
+        return db_session.get(models.Order, existing_claim["order_id"])
 
     order = models.Order(
         id=str(uuid.uuid4()), customer_id=order_request.customer_id, status="PENDING"
@@ -75,7 +75,7 @@ def create_order(
             models.OrderItem(product_id=item.product_id, quantity=item.quantity)
         )
 
-    db.add(order)
+    db_session.add(order)
 
     outbox_payload = {
         "order_id": order.id,
@@ -92,18 +92,18 @@ def create_order(
         payload=json.dumps(outbox_payload),
         status="pending",
     )
-    db.add(outbox_message)
+    db_session.add(outbox_message)
 
     try:
-        db.commit()
+        db_session.commit()
     except Exception:
-        db.rollback()
+        db_session.rollback()
         # Release the claim so a retry isn't blocked behind a 5-minute
         # TTL for a request that actually failed, not one still running.
         redis_client.delete(redis_key)
         raise
 
-    db.refresh(order)
+    db_session.refresh(order)
 
     redis_client.set(
         redis_key,

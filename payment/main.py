@@ -34,7 +34,7 @@ def call_payment_api(order_id: str, items: list) -> bool:
     return True
 
 
-def process_order_created(db, event: dict) -> None:
+def process_order_created(db_session, event: dict) -> None:
     order_id = event["data"]["order_id"]
     items = event["data"]["items"]
     message_id = event["id"]
@@ -53,8 +53,8 @@ def process_order_created(db, event: dict) -> None:
         status=upsert_statement.inserted.status, message_id=upsert_statement.inserted.message_id
     )
 
-    db.execute(upsert_statement)
-    db.commit()
+    db_session.execute(upsert_statement)
+    db_session.commit()
 
     logger.info(
         "Recorded payment step result for order %s: %s (message_id=%s)",
@@ -94,18 +94,18 @@ def main():
             continue
 
         event = json.loads(record.value.decode("utf-8"))
-        db = SessionLocal()
+        db_session = SessionLocal()
         try:
-            process_order_created(db, event)
+            process_order_created(db_session, event)
             consumer.commit()
         except Exception:
             logger.exception(
                 "Failed to process order %s", event.get("data", {}).get("order_id")
             )
-            db.rollback()
+            db_session.rollback()
             # Don't commit the offset - this message will be redelivered.
         finally:
-            db.close()
+            db_session.close()
 
 
 if __name__ == "__main__":

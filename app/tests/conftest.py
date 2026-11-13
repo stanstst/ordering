@@ -68,6 +68,6 @@ def client(test_engine):
 def db_session(test_engine):
     from shared.database import SessionLocal
 
-    session = SessionLocal()
-    yield session
-    session.close()
+    db_session = SessionLocal()
+    yield db_session
+    db_session.close()

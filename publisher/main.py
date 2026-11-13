@@ -33,7 +33,7 @@ def build_kafka_message(outbox_row: OutboxMessage) -> dict:
     }
 
 
-def publish_pending_batch(producer: KafkaProducer, db) -> int:
+def publish_pending_batch(producer: KafkaProducer, db_session) -> int:
     # .query(...).filter(...).order_by(...).limit(...) builds a SELECT
     # statement piece by piece; .all() is what actually runs it.
     #
@@ -44,7 +44,7 @@ def publish_pending_batch(producer: KafkaProducer, db) -> int:
     # That's what lets multiple publisher instances poll concurrently
     # without two of them grabbing (and re-publishing) the same row.
     pending_rows = (
-        db.query(OutboxMessage)
+        db_session.query(OutboxMessage)
         .filter(OutboxMessage.status == "pending")
         .order_by(OutboxMessage.created_at)
         .limit(BATCH_SIZE)
@@ -67,7 +67,7 @@ def publish_pending_batch(producer: KafkaProducer, db) -> int:
     # send() only queues the message in memory; flush() blocks until the
     # broker has actually acknowledged every queued message.
     producer.flush()
-    db.commit()
+    db_session.commit()
 
     return len(pending_rows)
 
@@ -82,16 +82,16 @@ def main():
     )
 
     while True:
-        db = SessionLocal()
+        db_session = SessionLocal()
         try:
-            published_count = publish_pending_batch(producer, db)
+            published_count = publish_pending_batch(producer, db_session)
             if published_count:
                 logger.info("Published %d message(s)", published_count)
         except Exception:
             logger.exception("Failed to publish outbox batch")
-            db.rollback()
+            db_session.rollback()
         finally:
-            db.close()
+            db_session.close()
 
         time.sleep(POLL_INTERVAL_SECONDS)
 
