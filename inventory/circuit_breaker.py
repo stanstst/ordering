@@ -50,10 +50,11 @@ class CircuitBreaker:
         self.cooldown_seconds = cooldown_seconds
         self.probe_timeout_seconds = probe_timeout_seconds
 
-    def call(self, func, *args):
-        # *args collects any positional arguments into a tuple, and func(*args)
-        # unpacks them again - so call(f, a, b) ends up running f(a, b).
-        state = self._current_state()
+    def call(self, protected_call, *call_arguments):
+        # *call_arguments collects any positional arguments into a tuple, and
+        # protected_call(*call_arguments) unpacks them again - so
+        # call(f, a, b) ends up running f(a, b).
+        state = self._get_current_state()
 
         if state == OPEN:
             raise CircuitOpenError(f"circuit {self.name} is open")
@@ -65,9 +66,9 @@ class CircuitBreaker:
             logger.info("Circuit %s HALF-OPEN: sending probe call", self.name)
 
         try:
-            result = func(*args)
+            result = protected_call(*call_arguments)
         except Exception as error:
-            if self._counts_as_failure(error):
+            if self._is_failure(error):
                 self._record_failure(state)
             else:
                 # A 4xx means the API answered - it is up, only this request
@@ -80,7 +81,7 @@ class CircuitBreaker:
         self._record_success(state)
         return result
 
-    def _counts_as_failure(self, error: Exception) -> bool:
+    def _is_failure(self, error: Exception) -> bool:
         # getattr(obj, "name", default) reads an attribute, or returns the
         # default when the object doesn't have it.
         status_code = getattr(error, "status_code", None)
@@ -90,7 +91,7 @@ class CircuitBreaker:
         # 5xx = the API is unhealthy -> count. 4xx = our request was wrong -> skip.
         return status_code >= 500
 
-    def _current_state(self) -> str:
+    def _get_current_state(self) -> str:
         try:
             if self.redis.exists(self.open_key):
                 return OPEN
@@ -108,10 +109,10 @@ class CircuitBreaker:
             # SET ... NX EX: only set the key if it does Not eXist, and let it
             # EXpire after N seconds. Returns True only for the one replica
             # that created it. The expiry frees the lock if that replica crashes.
-            claimed = self.redis.set(
+            is_claimed = self.redis.set(
                 self.probe_key, 1, nx=True, ex=self.probe_timeout_seconds
             )
-            return bool(claimed)
+            return bool(is_claimed)
         except redis.RedisError:
             logger.warning("Circuit %s: Redis unavailable, allowing probe", self.name)
             return True

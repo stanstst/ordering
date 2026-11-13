@@ -97,26 +97,26 @@ def process_order_created(db, event: dict) -> None:
     # InventoryApiError - both propagate to main(), which retries the same
     # message later. A 4xx won't succeed on retry, so the step fails now.
     try:
-        success = inventory_api_breaker.call(call_inventory_api, order_id, items)
+        is_successful = inventory_api_breaker.call(call_inventory_api, order_id, items)
     except InventoryApiError as error:
         if not error.is_client_error():
             raise
         logger.warning("Inventory API rejected order %s: %s", order_id, error)
-        success = False
-    status = "success" if success else "failed"
+        is_successful = False
+    status = "success" if is_successful else "failed"
 
     record_step_result(db, order_id, status, message_id)
 
 
 def record_step_result(db, order_id: str, status: str, message_id: str) -> None:
-    db_query = mysql_insert(OrderStepResult).values(
+    upsert_statement = mysql_insert(OrderStepResult).values(
         order_id=order_id, step="inventory", status=status, message_id=message_id
     )
-    db_query = db_query.on_duplicate_key_update(
-        status=db_query.inserted.status, message_id=db_query.inserted.message_id
+    upsert_statement = upsert_statement.on_duplicate_key_update(
+        status=upsert_statement.inserted.status, message_id=upsert_statement.inserted.message_id
     )
 
-    db.execute(db_query)
+    db.execute(upsert_statement)
     db.commit()
 
     logger.info(
@@ -136,17 +136,17 @@ def retry_later(consumer, record, retry_seconds: int) -> None:
     time.sleep(retry_seconds)
 
 
-def count_attempt(record) -> int:
+def increment_attempt_count(record) -> int:
     # topic + partition + offset identifies a Kafka message exactly, even
     # when its JSON can't be parsed.
-    key = f"retry:inventory:{record.topic}:{record.partition}:{record.offset}"
+    attempt_counter_key = f"retry:inventory:{record.topic}:{record.partition}:{record.offset}"
     try:
-        attempt = redis_client.incr(key)
-        redis_client.expire(key, ATTEMPT_COUNTER_TTL_SECONDS)
+        attempt = redis_client.incr(attempt_counter_key)
+        redis_client.expire(attempt_counter_key, ATTEMPT_COUNTER_TTL_SECONDS)
         return attempt
     except redis.RedisError:
         # Can't count -> never give up while Redis is down, just keep retrying.
-        logger.warning("Redis unavailable, attempt for %s not counted", key)
+        logger.warning("Redis unavailable, attempt for %s not counted", attempt_counter_key)
         return 1
 
 
@@ -236,7 +236,7 @@ def main():
             retry_later(consumer, record, retry_seconds)
         except Exception:
             db.rollback()
-            attempt = count_attempt(record)
+            attempt = increment_attempt_count(record)
             if attempt < MAX_ATTEMPTS:
                 # ** is "to the power of": 2 * 2**0, 2 * 2**1, ... = 2, 4, 8, 16
                 retry_seconds = ERROR_RETRY_BASE_SECONDS * 2 ** (attempt - 1)

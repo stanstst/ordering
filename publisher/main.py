@@ -52,17 +52,17 @@ def publish_pending_batch(producer: KafkaProducer, db) -> int:
         .all()
     )
 
-    for row in pending_rows:
-        message = build_kafka_message(row)
-        headers = [("event_type", row.event_type.encode("utf-8"))]
+    for outbox_row in pending_rows:
+        kafka_message = build_kafka_message(outbox_row)
+        headers = [("event_type", outbox_row.event_type.encode("utf-8"))]
         producer.send(
             KAFKA_TOPIC,
-            key=row.aggregate_ref_id.encode("utf-8"),
-            value=message,
+            key=outbox_row.aggregate_ref_id.encode("utf-8"),
+            value=kafka_message,
             headers=headers,
         )
-        logger.info(json.dumps(message))
-        row.status = "sent"
+        logger.info(json.dumps(kafka_message))
+        outbox_row.status = "sent"
 
     # send() only queues the message in memory; flush() blocks until the
     # broker has actually acknowledged every queued message.

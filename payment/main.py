@@ -39,21 +39,21 @@ def process_order_created(db, event: dict) -> None:
     items = event["data"]["items"]
     message_id = event["id"]
 
-    success = call_payment_api(order_id, items)
-    status = "success" if success else "failed"
+    is_successful = call_payment_api(order_id, items)
+    status = "success" if is_successful else "failed"
 
     # "INSERT ... ON DUPLICATE KEY UPDATE" - MySQL's atomic upsert. Inserts
     # a new (order_id, "payment") row, or updates it in place if one
     # already exists - makes this idempotent under Kafka's at-least-once
     # redelivery without a separate SELECT-then-write race.
-    db_query = mysql_insert(OrderStepResult).values(
+    upsert_statement = mysql_insert(OrderStepResult).values(
         order_id=order_id, step="payment", status=status, message_id=message_id
     )
-    db_query = db_query.on_duplicate_key_update(
-        status=db_query.inserted.status, message_id=db_query.inserted.message_id
+    upsert_statement = upsert_statement.on_duplicate_key_update(
+        status=upsert_statement.inserted.status, message_id=upsert_statement.inserted.message_id
     )
 
-    db.execute(db_query)
+    db.execute(upsert_statement)
     db.commit()
 
     logger.info(

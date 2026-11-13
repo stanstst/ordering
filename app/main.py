@@ -17,21 +17,21 @@ app = FastAPI(title="Ordering Service")
 IDEMPOTENCY_TTL_SECONDS = 5 * 60
 
 
-def idempotency_redis_key(idempotency_key: str) -> str:
+def build_idempotency_redis_key(idempotency_key: str) -> str:
     return f"idempotency:{idempotency_key}"
 
 
 @app.get("/")
-def index():
+def get_health_status():
     return {"status": "OK"}
 
 @app.post("/orders", response_model=schemas.OrderOut, status_code=201)
 def create_order(
-    order_in: schemas.OrderCreate,
+    order_request: schemas.OrderCreate,
     db: Session = Depends(get_db),
     idempotency_key: str = Header(alias="Idempotency-Key"),
 ):
-    if not order_in.items:
+    if not order_request.items:
         raise HTTPException(
             status_code=422, detail="Order must contain at least one item"
         )
@@ -39,38 +39,38 @@ def create_order(
     # sha256 of the exact request body - lets us tell "same retry" apart
     # from "this key was reused for a different order" (a client bug).
     request_hash = hashlib.sha256(
-        order_in.model_dump_json().encode("utf-8")
+        order_request.model_dump_json().encode("utf-8")
     ).hexdigest()
-    redis_key = idempotency_redis_key(idempotency_key)
+    redis_key = build_idempotency_redis_key(idempotency_key)
 
     # set(nx=True) is Redis's atomic "set only if this key doesn't already
     # exist" - only one of any concurrent requests sharing the same key can
     # win this claim, so this replaces the MySQL unique constraint +
     # IntegrityError we used to rely on for that race.
-    claimed = redis_client.set(
+    is_claimed = redis_client.set(
         redis_key,
         json.dumps({"status": "processing"}),
         nx=True,
         ex=IDEMPOTENCY_TTL_SECONDS,
     )
-    if not claimed:
-        existing = json.loads(redis_client.get(redis_key))
-        if existing["status"] == "processing":
+    if not is_claimed:
+        existing_claim = json.loads(redis_client.get(redis_key))
+        if existing_claim["status"] == "processing":
             raise HTTPException(
                 status_code=409,
                 detail="A request with this Idempotency-Key is still being processed",
             )
-        if existing["request_hash"] != request_hash:
+        if existing_claim["request_hash"] != request_hash:
             raise HTTPException(
                 status_code=409,
                 detail="Idempotency-Key was already used with a different request body",
             )
-        return db.get(models.Order, existing["order_id"])
+        return db.get(models.Order, existing_claim["order_id"])
 
     order = models.Order(
-        id=str(uuid.uuid4()), customer_id=order_in.customer_id, status="PENDING"
+        id=str(uuid.uuid4()), customer_id=order_request.customer_id, status="PENDING"
     )
-    for item in order_in.items:
+    for item in order_request.items:
         order.items.append(
             models.OrderItem(product_id=item.product_id, quantity=item.quantity)
         )

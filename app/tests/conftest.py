@@ -17,7 +17,7 @@ os.environ["REDIS_URL"] = "redis://redis:6379/1"
 
 
 @pytest.fixture(scope="session")
-def test_database():
+def test_engine():
 
     admin_engine = create_engine(MYSQL_ADMIN_URL)
     # begin() opens a transaction and commits it when the block ends.
@@ -41,13 +41,13 @@ def test_database():
 
 
 @pytest.fixture(autouse=True)
-def refresh_database(test_database):
+def clean_database(test_engine):
     yield
 
     from shared.database import Base
     from shared.redis_client import redis_client
 
-    with test_database.begin() as connection:
+    with test_engine.begin() as connection:
         # sorted_tables is parents-first; delete children first so foreign
         # keys (order_items -> orders) don't block the delete.
         for table in reversed(Base.metadata.sorted_tables):
@@ -57,7 +57,7 @@ def refresh_database(test_database):
 
 
 @pytest.fixture
-def client(test_database):
+def client(test_engine):
     from app.main import app
 
     with TestClient(app) as test_client:
@@ -65,7 +65,7 @@ def client(test_database):
 
 
 @pytest.fixture
-def db_session(test_database):
+def db_session(test_engine):
     from shared.database import SessionLocal
 
     session = SessionLocal()
